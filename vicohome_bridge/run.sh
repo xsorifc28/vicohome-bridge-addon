@@ -226,13 +226,17 @@ analyze_bird_video() {
   mkdir -p "$tmp_dir"
   local video_file="${tmp_dir}/vid.mp4"
 
-  # Download the clip
-  if ! curl -s -L -o "$video_file" "$video_url"; then
-    bashio::log.error "Failed to download video from ${video_url}"
+  # Download and transmux HLS to MP4
+  bashio::log.debug "Downloading and converting HLS stream to MP4..."
+  if ! ffmpeg -y -protocol_whitelist file,http,https,tcp,tls -i "$video_url" -c copy "$video_file" >/tmp/ffmpeg_download.log 2>&1; then
+    bashio::log.error "Failed to download video from HLS stream. Check /tmp/ffmpeg_download.log"
     rm -rf "$tmp_dir"
     return 1
   fi
-  bashio::log.debug "Video downloaded to ${video_file} ($(stat -c%s "$video_file") bytes)"
+
+  local file_size
+  file_size=$(stat -c%s "$video_file" 2>/dev/null || echo 0)
+  bashio::log.debug "Video saved to ${video_file} (${file_size} bytes)"
 
   local best_class="No Bird Detected"
   local best_conf=0
