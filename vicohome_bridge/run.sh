@@ -249,14 +249,14 @@ analyze_bird_video() {
 
     if [ -f "$frame" ] && [ -s "$frame" ]; then
       bashio::log.debug "Frame extracted: ${frame} ($(stat -c%s "$frame") bytes)"
-      # Convert image to Base64 (single line)
+      # Convert image to Base64 (single line) with data URI prefix
       local b64_image
-      b64_image=$(base64 "$frame" | tr -d '\n')
+      b64_image="data:image/jpeg;base64,$(base64 "$frame" | tr -d '\n')"
 
-      # POST to Roboflow
+      # POST to Roboflow Classify API
       bashio::log.debug "Sending frame to Roboflow..."
       local response
-      response=$(curl -s -X POST "https://serverless.roboflow.com/${ROBOFLOW_MODEL_ID}?api_key=${ROBOFLOW_API_KEY}" \
+      response=$(curl -s -X POST "https://classify.roboflow.com/${ROBOFLOW_MODEL_ID}?api_key=${ROBOFLOW_API_KEY}" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         -d "$b64_image")
 
