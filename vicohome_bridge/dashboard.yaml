@@ -30,7 +30,9 @@ views:
             {% set img = state_attr(s.entity_id, 'imageUrl') %}
             {% set vid = state_attr(s.entity_id, 'videoUrl') %}
             {% set etype = state_attr(s.entity_id, 'eventType') or state_attr(s.entity_id, 'type') %}
+
             {% set bird_id = s.entity_id | replace('_last_event', '_bird_id') %}
+            {% set bird_result = states(bird_id) %}
 
             {% if ts %}
               {% set ts_local = as_timestamp(ts) | as_datetime | as_local %}
@@ -47,15 +49,13 @@ views:
             ### {{ cam_name }}
 
             **Last event:** {{ ts_rel }}
-            {% if ts_local %} _({{ ts_local }})_ {% endif %}
+            {% if ts_local %} (_{{ ts_local }}_){% endif %}
 
             {% if etype %}
             **Type:** `{{ etype }}`
             {% endif %}
             
-            {% if bird_result and bird_result not in ['unknown', 'unavailable', 'No Bird Detected'] %}
             **Bird AI:** {{ bird_result }}
-            {% endif %}
 
             {% if img %}
             ![thumb]({{ img }})
