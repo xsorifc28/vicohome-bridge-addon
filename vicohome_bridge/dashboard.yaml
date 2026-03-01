@@ -4,37 +4,33 @@ views:
     path: vicohome
     icon: mdi:cctv
     cards:
+      # ==============================
+      # Card 1: Last events + thumbnails
+      # ==============================
       - type: custom:config-template-card
         entities:
           - sun.sun
-          - sensor.vicohome_*_bird_id
         card:
           type: markdown
           title: Vicohome Last Events
           content: >
             {% set sensors = states.sensor
-                   | selectattr('entity_id', 'search', '^sensor\.vicohome_.*_last_event$')
-                   | list %}
+                 | selectattr('entity_id', 'search', '^sensor\.vicohome_.*_last_event$')
+                 | list %}
 
-            {% if not sensors %} _No Vicohome cameras found yet. Make sure the
-            Vicohome Bridge add-on is running and events have been pulled._ {%
-            endif %}
+            {% if not sensors %}
+            _No Vicohome cameras found yet. Make sure the Vicohome Bridge add-on is running and events have been pulled._
+            {% endif %}
 
-            {% for s in sensors|sort(attribute='name') %}  {% set raw_name =
-            s.name %}  {% set cam_name = raw_name | replace(' Last Event', '')
-            %}
-
-            {# --- NEW BIRD AI LOGIC --- #}
-            {# Construct the entity ID for the bird sensor based on camera name #}
-            {% set bird_sensor_id = 'sensor.vicohome_' ~ cam_name | slugify ~ '_bird_id' %}
-            {% set bird_result = states(bird_sensor_id) %}
-            {% set bird_images = state_attr(bird_sensor_id, 'images') %}
-            {# ------------------------- #}
+            {% for s in sensors %}
+            {% set raw_name = s.name %}
+            {% set cam_name = raw_name | replace(' Last Event', '') %}
 
             {% set ts  = state_attr(s.entity_id, 'timestamp') %}
             {% set img = state_attr(s.entity_id, 'imageUrl') %}
             {% set vid = state_attr(s.entity_id, 'videoUrl') %}
             {% set etype = state_attr(s.entity_id, 'eventType') or state_attr(s.entity_id, 'type') %}
+            {% set bird_id = s.entity_id | replace('_last_event', '_bird_id') %}
 
             {% if ts %}
               {% set ts_local = as_timestamp(ts) | as_datetime | as_local %}
@@ -44,35 +40,38 @@ views:
               {% set ts_rel = 'No events yet' %}
             {% endif %}
 
-            {% if not loop.first %} --- {% endif %}
+            {% if not loop.first %}
+            ---
+            {% endif %}
 
             ### {{ cam_name }}
 
-            **Last event:** {{ ts_rel }} {% if ts_local %}_ ({{ ts_local }})_{% endif %}
+            **Last event:** {{ ts_rel }}
+            {% if ts_local %} _({{ ts_local }})_ {% endif %}
 
-            {% if etype %} **Type:** `{{ etype }}` {% endif %}
-
-            {# --- DISPLAY BIRD AI RESULT --- #}
-            {% if bird_result and bird_result != 'unknown' and bird_result != 'unavailable' %}
-              **Bird AI:** {{ bird_result }}
-              
-              {% if bird_images %}
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
-                {% for b64 in bird_images %}
-                  <img src="{{ b64 }}" style="width: 30%; min-width: 100px; border-radius: 8px; border: 1px solid #ccc;" />
-                {% endfor %}
-                </div>
-              {% endif %}
-            {% elif img %}
-              ![thumb]({{ img }})
-            {% else %}
-              _No image available_
+            {% if etype %}
+            **Type:** `{{ etype }}`
             {% endif %}
-            {# ------------------------------ #}
+            
+            {% if bird_result and bird_result not in ['unknown', 'unavailable', 'No Bird Detected'] %}
+            **Bird AI:** {{ bird_result }}
+            {% endif %}
 
-            {% if vid %} [▶ Watch clip]({{ vid }}) {% endif %}
+            {% if img %}
+            ![thumb]({{ img }})
+            {% else %}
+            _No image available_
+            {% endif %}
+
+            {% if vid %}
+            [▶ Watch clip]({{ vid }})
+            {% endif %}
 
             {% endfor %}
+
+      # ==============================
+      # Card 2: Camera health overview
+      # ==============================
       - type: custom:config-template-card
         entities:
           - sun.sun
@@ -81,24 +80,29 @@ views:
           title: Vicohome Camera Health
           content: >
             {% set sensors = states.sensor
-                   | selectattr('entity_id', 'search', '^sensor\.vicohome_.*_last_event$')
-                   | list %}
+                 | selectattr('entity_id', 'search', '^sensor\.vicohome_.*_last_event$')
+                 | list %}
 
-            {% if not sensors %} _No Vicohome cameras found yet._ {% endif %}
+            {% if not sensors %}
+            _No Vicohome cameras found yet._
+            {% endif %}
 
-            {% for s in sensors|sort(attribute='name') %} {% set raw_name =
-            s.name %} {% set cam_name = raw_name | replace(' Last Event', '') %}
+            {% for s in sensors|sort(attribute='name') %}
+            {% set raw_name = s.name %}
+            {% set cam_name = raw_name | replace(' Last Event', '') %}
 
-            {% set batt_id   = s.entity_id | replace('_last_event', '_battery')
-            %} {% set wifi_id   = s.entity_id | replace('_last_event', '_wifi')
-            %} {% set online_id = s.entity_id
-                                       | replace('sensor.', 'binary_sensor.')
-                                       | replace('_last_event', '_online') %}
+            {% set batt_id   = s.entity_id | replace('_last_event', '_battery') %}
+            {% set wifi_id   = s.entity_id | replace('_last_event', '_wifi') %}
+            {% set online_id = s.entity_id
+                               | replace('sensor.', 'binary_sensor.')
+                               | replace('_last_event', '_online') %}
 
-            {% set batt   = states(batt_id) %} {% set wifi   = states(wifi_id)
-            %} {% set online = states(online_id) %}
+            {% set batt   = states(batt_id) %}
+            {% set wifi   = states(wifi_id) %}
+            {% set online = states(online_id) %}
 
-            {% set ts  = state_attr(s.entity_id, 'timestamp') %} {% if ts %}
+            {% set ts  = state_attr(s.entity_id, 'timestamp') %}
+            {% if ts %}
               {% set ts_local = as_timestamp(ts) | as_datetime | as_local %}
               {% set ts_rel   = ts_local | relative_time %}
               {% set last_str = ts_rel ~ ' (' ~ ts_local ~ ')' %}
@@ -106,18 +110,17 @@ views:
               {% set last_str = 'No events yet' %}
             {% endif %}
 
-            {% if not loop.first %} --- {% endif %}
+            {% if not loop.first %}
+            ---
+            {% endif %}
 
             ### {{ cam_name }}
 
-            **Status:** {% if online == 'on' %}✅ Online{% elif online == 'off'
-            %}❌ Offline{% else %}Unknown{% endif %}
+            **Status:** {% if online == 'on' %}✅ Online{% elif online == 'off' %}❌ Offline{% else %}Unknown{% endif %}
 
-            **Battery:** {% if batt in ['unknown', 'unavailable', '']
-            %}Unknown{% else %}{{ batt }}%{% endif %}
+            **Battery:** {% if batt in ['unknown', 'unavailable', ''] %}Unknown{% else %}{{ batt }}%{% endif %}
 
-            **WiFi:** {% if wifi in ['unknown', 'unavailable', ''] %}Unknown{%
-            else %}{{ wifi }} dBm{% endif %}
+            **WiFi:** {% if wifi in ['unknown', 'unavailable', ''] %}Unknown{% else %}{{ wifi }} dBm{% endif %}
 
             **Last event:** {{ last_str }}
 
