@@ -24,17 +24,17 @@ views:
             s.name %}  {% set cam_name = raw_name | replace(' Last Event', '')
             %}
 
-            {# --- NEW BIRD AI LOGIC --- #} {# Construct the entity ID for the
-            bird sensor based on camera name #} {% set bird_sensor_id =
-            'sensor.vicohome_' ~ cam_name | slugify ~ '_bird_id' %} {% set
-            bird_result = states(bird_sensor_id) %} {# -------------------------
-            #}
+            {# --- NEW BIRD AI LOGIC --- #}
+            {# Construct the entity ID for the bird sensor based on camera name #}
+            {% set bird_sensor_id = 'sensor.vicohome_' ~ cam_name | slugify ~ '_bird_id' %}
+            {% set bird_result = states(bird_sensor_id) %}
+            {% set bird_images = state_attr(bird_sensor_id, 'images') %}
+            {# ------------------------- #}
 
-            {% set ts  = state_attr(s.entity_id, 'timestamp') %} {% set img =
-            state_attr(s.entity_id, 'imageUrl') %} {% set vid =
-            state_attr(s.entity_id, 'videoUrl') %} {% set etype =
-            state_attr(s.entity_id, 'eventType') or state_attr(s.entity_id,
-            'type') %}
+            {% set ts  = state_attr(s.entity_id, 'timestamp') %}
+            {% set img = state_attr(s.entity_id, 'imageUrl') %}
+            {% set vid = state_attr(s.entity_id, 'videoUrl') %}
+            {% set etype = state_attr(s.entity_id, 'eventType') or state_attr(s.entity_id, 'type') %}
 
             {% if ts %}
               {% set ts_local = as_timestamp(ts) | as_datetime | as_local %}
@@ -48,19 +48,29 @@ views:
 
             ### {{ cam_name }}
 
-            **Last event:** {{ ts_rel }} {% if ts_local %}_ ({{ ts_local }})_{%
-            endif %}
+            **Last event:** {{ ts_rel }} {% if ts_local %}_ ({{ ts_local }})_{% endif %}
 
             {% if etype %} **Type:** `{{ etype }}` {% endif %}
 
-            {% if img %} ![thumb]({{ img }}) {% else %} _No image available_ {%
-            endif %}
+            {# --- DISPLAY BIRD AI RESULT --- #}
+            {% if bird_result and bird_result != 'unknown' and bird_result != 'unavailable' %}
+              **Bird AI:** {{ bird_result }}
+              
+              {% if bird_images %}
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                {% for b64 in bird_images %}
+                  <img src="{{ b64 }}" style="width: 30%; min-width: 100px; border-radius: 8px; border: 1px solid #ccc;" />
+                {% endfor %}
+                </div>
+              {% endif %}
+            {% elif img %}
+              ![thumb]({{ img }})
+            {% else %}
+              _No image available_
+            {% endif %}
+            {# ------------------------------ #}
 
             {% if vid %} [▶ Watch clip]({{ vid }}) {% endif %}
-
-            {# --- DISPLAY BIRD AI RESULT --- #} {% if bird_result and
-            bird_result != 'unknown' %} **Bird AI:** {{ bird_result }} {% endif
-            %} {# ------------------------------ #}
 
             {% endfor %}
       - type: custom:config-template-card
