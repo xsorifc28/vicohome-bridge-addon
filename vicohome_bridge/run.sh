@@ -207,7 +207,7 @@ publish_event_for_camera() {
 
   local trace_id
   trace_id=$(echo "${event_json}" | jq -r '.traceId // empty')
-  
+
   if [ -n "${trace_id}" ]; then
     if grep -q "${trace_id}" "${SEEN_IDS_FILE}" 2>/dev/null; then
       bashio::log.debug "Skipping already processed event ${trace_id}"
@@ -227,7 +227,7 @@ publish_event_for_camera() {
     -t "${BASE_TOPIC}/${camera_safe_id}/state" \
     -m "${event_json}" \
     -q 0 || bashio::log.warning "Failed to publish MQTT message for ${BASE_TOPIC}/${camera_safe_id}/state"
-  
+
   return 0
 }
 
@@ -405,7 +405,7 @@ poll_device_health() {
   local device_count
   device_count=$(echo "${devices_output}" | jq 'length')
   bashio::log.info "vico-cli devices list returned ${device_count} device(s) for telemetry publishing."
-  bashio::log.debug "Device list payload preview: $(echo "${devices_output}" | tr -d '\n' | head -c 400)"
+  bashio::log.debug "Device list payload preview: $(echo "${devices_output}" | tr -d '\n')"
 
   echo "${devices_output}" | jq -c '.[]' | while read -r device; do
     publish_device_health "${device}"
@@ -465,7 +465,7 @@ while true; do
     continue
   fi
 
-  bashio::log.info "vico-cli output (first 200 chars): $(echo "${JSON_OUTPUT}" | head -c 200)"
+  bashio::log.info "vico-cli output: $(echo "${JSON_OUTPUT}")"
 
   # Quick sanity check so we don't feed clearly non-JSON into jq
   first_char=$(printf '%s' "${JSON_OUTPUT}" | sed -n '1s/^\(.\).*$/\1/p')
@@ -480,7 +480,7 @@ while true; do
     echo "${JSON_OUTPUT}" | jq -c 'reverse | .[]' | while read -r event; do
       CAMERA_ID=$(echo "${event}" | jq -r '.serialNumber // .deviceId // .device_id // .camera_id // .camera.uuid // .cameraId // empty')
       if [ -z "${CAMERA_ID}" ] || [ "${CAMERA_ID}" = "null" ]; then
-        bashio::log.info "Event without camera/device ID, skipping. Event snippet: $(echo "${event}" | head -c 120)"
+        bashio::log.info "Event without camera/device ID, skipping. Event snippet: $(echo "${event}")"
         continue
       fi
 
@@ -492,15 +492,15 @@ while true; do
 
       SAFE_ID=$(sanitize_id "${CAMERA_ID}")
 
-      event_preview=$(echo "${event}" | tr -d '\n' | head -c 400)
+      event_preview=$(echo "${event}" | tr -d '\n')
       bashio::log.debug "Event for ${SAFE_ID} (${CAMERA_NAME}) type='${EVENT_TYPE}': ${event_preview}"
 
       ensure_discovery_published "${CAMERA_ID}" "${CAMERA_NAME}"
-      publish_event_for_camera "${SAFE_ID}" "${event}"
-
-      if [ "${EVENT_TYPE}" = "motion" ] || [ "${EVENT_TYPE}" = "person" ] || [ "${EVENT_TYPE}" = "human" ] || [ "${EVENT_TYPE}" = "bird" ]; then
-        bashio::log.debug "Triggering motion pulse for ${SAFE_ID} because event type '${EVENT_TYPE}' requires it."
-        publish_motion_pulse "${SAFE_ID}"
+      if publish_event_for_camera "${SAFE_ID}" "${event}"; then
+        if [ "${EVENT_TYPE}" = "motion" ] || [ "${EVENT_TYPE}" = "person" ] || [ "${EVENT_TYPE}" = "human" ] || [ "${EVENT_TYPE}" = "bird" ]; then
+          bashio::log.debug "Triggering motion pulse for ${SAFE_ID} because event type '${EVENT_TYPE}' requires it."
+          publish_motion_pulse "${SAFE_ID}"
+        fi
       fi
     done
   else
@@ -509,7 +509,7 @@ while true; do
 
     CAMERA_ID=$(echo "${event}" | jq -r '.serialNumber // .deviceId // .device_id // .camera_id // .camera.uuid // .cameraId // empty')
     if [ -z "${CAMERA_ID}" ] || [ "${CAMERA_ID}" = "null" ]; then
-      bashio::log.info "Single event without camera/device ID. Event snippet: $(echo "${event}" | head -c 120)"
+      bashio::log.info "Single event without camera/device ID. Event snippet: $(echo "${event}")"
       sleep "${POLL_INTERVAL}"
       continue
     fi
@@ -522,7 +522,7 @@ while true; do
 
     SAFE_ID=$(sanitize_id "${CAMERA_ID}")
 
-    event_preview=$(echo "${event}" | tr -d '\n' | head -c 400)
+    event_preview=$(echo "${event}" | tr -d '\n')
     bashio::log.debug "Event for ${SAFE_ID} (${CAMERA_NAME}) type='${EVENT_TYPE}': ${event_preview}"
 
     ensure_discovery_published "${CAMERA_ID}" "${CAMERA_NAME}"
