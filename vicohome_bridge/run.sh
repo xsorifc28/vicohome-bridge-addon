@@ -287,9 +287,12 @@ analyze_bird_video() {
   done
 
   # Publish result
-  local conf_pct
-  conf_pct=$(echo "$best_conf * 100 / 1" | jq '. | round')
-  local final_msg="${best_class} (${conf_pct}%)"
+  local final_msg="${best_class}"
+  if [[ $(jq -rn "$best_conf > 0") == "true" ]]; then
+    local conf_pct
+    conf_pct=$(jq -rn "($best_conf * 100) | round")
+    final_msg="${best_class} (${conf_pct}%)"
+  fi
 
   bashio::log.info "AI Analysis Complete: ${final_msg}. Publishing to MQTT..."
   mosquitto_pub ${MQTT_ARGS} -t "${BASE_TOPIC}/${camera_safe_id}/bird_id" -m "${final_msg}" -r || \
