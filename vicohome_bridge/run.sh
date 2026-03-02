@@ -241,8 +241,14 @@ analyze_bird_video() {
   local best_class="No Bird Detected"
   local best_conf=0
 
-  # Best of 3 frames: Extracting frames at 2s, 5s, and 8s
-  for ts in 2 5 8; do
+  # Get video duration in seconds (rounded down)
+  local duration
+  duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$video_file" | cut -d. -f1)
+  [ -z "$duration" ] && duration=0
+  bashio::log.debug "Video duration: ${duration}s"
+
+  # Process 1 frame per second
+  for (( ts=1; ts<=duration; ts++ )); do
     local frame="${tmp_dir}/f_${ts}.jpg"
     bashio::log.debug "Extracting frame at ${ts}s..."
     ffmpeg -y -ss "$ts" -i "$video_file" -frames:v 1 -q:v 2 "$frame" >/tmp/ffmpeg_log 2>&1
@@ -250,13 +256,13 @@ analyze_bird_video() {
     if [ -f "$frame" ] && [ -s "$frame" ]; then
       bashio::log.debug "Frame extracted: ${frame} ($(stat -c%s "$frame") bytes)"
 
-      # Convert image to Base64 and save to file to avoid ARG_MAX issues
+      # Convert image to Base64
       local b64_file="${tmp_dir}/b64_${ts}.txt"
       echo -n "data:image/jpeg;base64," > "$b64_file"
       base64 "$frame" | tr -d '\n' >> "$b64_file"
 
       # POST to Roboflow Classify API
-      bashio::log.debug "Sending frame to Roboflow..."
+      bashio::log.debug "Sending frame ${ts}s to Roboflow..."
       local response
       response=$(curl -s -X POST "https://classify.roboflow.com/${ROBOFLOW_MODEL_ID}?api_key=${ROBOFLOW_API_KEY}" \
         -H "Content-Type: application/x-www-form-urlencoded" \
@@ -273,18 +279,26 @@ analyze_bird_video() {
         conf=$(echo "$top_pred" | jq -r '.confidence')
         local class
         class=$(echo "$top_pred" | jq -r '.class')
-        bashio::log.info "Found prediction: ${class} with confidence ${conf}"
+        bashio::log.info "Found prediction at ${ts}s: ${class} with confidence ${conf}"
 
         # Compare confidence safely with jq
         if [[ $(jq -rn --arg c "$conf" --arg bc "$best_conf" '($c|tonumber) > ($bc|tonumber)') == "true" ]]; then
           best_conf=$conf
           best_class=$class
         fi
+
+        # Short-circuit if confidence is >= 70%
+        if [[ $(jq -rn --arg c "$conf" '($c|tonumber) >= 0.7') == "true" ]]; then
+          bashio::log.info "Confidence threshold met (>= 70%). Short-circuiting."
+          break
+        fi
       else
-        bashio::log.debug "No predictions found in this frame."
+        bashio::log.debug "No predictions found in frame at ${ts}s."
       fi
     else
-      bashio::log.debug "Failed to extract frame at ${ts}s (video might be too short)."
+      bashio::log.debug "Failed to extract frame at ${ts}s (video might be too short or ended)."
+      # If we can't extract a frame, it might be the end of the video
+      if [ $ts -gt 1 ]; then break; fi
     fi
   done
 
