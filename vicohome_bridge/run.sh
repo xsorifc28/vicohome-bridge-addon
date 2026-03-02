@@ -245,10 +245,10 @@ analyze_bird_video() {
   local duration
   duration=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$video_file" | cut -d. -f1)
   [ -z "$duration" ] && duration=0
-  bashio::log.debug "Video duration: ${duration}s"
+  bashio::log.debug "Video duration: ${duration}s. Will process up to ${duration-1}s."
 
-  # Process 1 frame per second
-  for (( ts=1; ts<=duration; ts++ )); do
+  # Process 1 frame per second, stopping 1s before the end.
+  for (( ts=1; ts<duration; ts++ )); do
     local frame="${tmp_dir}/f_${ts}.jpg"
     bashio::log.debug "Extracting frame at ${ts}s..."
     ffmpeg -y -ss "$ts" -i "$video_file" -frames:v 1 -q:v 2 "$frame" >/tmp/ffmpeg_log 2>&1
